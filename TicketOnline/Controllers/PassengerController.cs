@@ -124,6 +124,34 @@ namespace TicketOnline.Controllers
                 return BadRequest(ModelState);
             }
         }
+        [HttpGet("CheckedPhonePassenger")]
+        public IActionResult CheckedNamberPassenger([FromQuery] string phone)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT COUNT(*) FROM Passenger WHERE PassengerPhone = @Phone";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@Phone", phone);
+
+                        int count = (int)command.ExecuteScalar();
+
+                        return Ok(count > 0); // If count is greater than 0, it means the passenger exists
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("passenger", $"Sorry, but we have an exception: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+        }
+
 
 
     }
