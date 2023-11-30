@@ -78,7 +78,7 @@ public IActionResult GetAllJoureny()
                             RouteJourney = reader.IsDBNull(1) ? null : reader.GetString(1),
                             DepartuerJourney = reader.IsDBNull(2) ? null : reader.GetString(2),
                             DestinationJourney = reader.IsDBNull(3) ? null : reader.GetString(3),
-                            DateJourney = reader.IsDBNull(4) ? null : reader.GetDateTime(4).ToString("yyyy-MM-dd"),
+                             DateJourney = reader.IsDBNull(4) ? null : reader.GetDateTime(4).ToString("yyyy-MM-dd"),
                             NumberBus = reader.GetInt32(5),
                             BusID = reader.GetInt32(6)
                         };
