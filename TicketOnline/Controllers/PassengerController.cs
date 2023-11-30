@@ -41,6 +41,7 @@ namespace TicketOnline.Controllers
                         command.Parameters.AddWithValue("@PassengerPassword", passengerDto.PassengerPassword); // Hash the password for security
 
                         command.ExecuteNonQuery();
+                        connection.Close();
                     }
                 }
 
@@ -83,6 +84,7 @@ namespace TicketOnline.Controllers
 
                                 passengers.Add(passenger);
                             }
+                            connection.Close();
                         }
                     }
                 }
@@ -113,7 +115,7 @@ namespace TicketOnline.Controllers
                         command.Parameters.AddWithValue("@Password", password);
 
                         int count = (int)command.ExecuteScalar();
-
+                        connection.Close();
                         return Ok(count > 0); // If count is greater than 0, it means the passenger exists
                     }
                 }
@@ -140,8 +142,9 @@ namespace TicketOnline.Controllers
                         command.Parameters.AddWithValue("@Phone", phone);
 
                         int count = (int)command.ExecuteScalar();
-
+                        connection.Close();
                         return Ok(count > 0); // If count is greater than 0, it means the passenger exists
+
                     }
                 }
             }
