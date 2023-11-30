@@ -8,7 +8,9 @@
 
         public string ModelBus { get; set; } 
 
-        public int  IdDriver { get; set; } 
-        
+        public int  IdDriver { get; set; }
+
+        public int NumberBus { get; set; }
+
     }
 }
