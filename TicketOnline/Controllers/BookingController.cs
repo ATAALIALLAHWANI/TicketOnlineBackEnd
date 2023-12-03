@@ -26,13 +26,16 @@ namespace TicketOnline.Controllers
                 {
                     connection.Open();
 
-                    string sql = "INSERT INTO Booking (DateBook, StatusBooking, PhonePassenger, JourneyId)" +
-                                 "VALUES (@DateBook, @StatusBooking, @PhonePassenger, @JourneyId);";
+                    string sql = "INSERT INTO Booking (DateBook, StatusBooking,TickitPrice , SeatsBooking ,PhonePassenger, JourneyId)" +
+                                 "VALUES (@DateBook, @StatusBooking  , @TickitPrice ,@SeatsBooking , @PhonePassenger, @JourneyId);";
 
                     using (var command = new SqlCommand(sql, connection))
                     {
-                        command.Parameters.AddWithValue("@DateBook", DateTime.Parse(bookingDto.DateBook)); // Assuming you want to parse the string to DateTime
+                        command.Parameters.AddWithValue("@DateBook", DateTime.Now.ToString("yyyy-MM-dd")); // Assuming you want to parse the string to DateTime
                         command.Parameters.AddWithValue("@StatusBooking", bookingDto.StatusBooking);
+                        command.Parameters.AddWithValue("@TickitPrice", bookingDto.TickitPrice);
+                        command.Parameters.AddWithValue("@SeatsBooking", bookingDto.SeatsBooking);
+
                         command.Parameters.AddWithValue("@PhonePassenger", bookingDto.PhonePassenger);
 
                         // Set JourneyId based on the selected Journey
@@ -76,9 +79,11 @@ namespace TicketOnline.Controllers
                                     IdBooking = reader.GetInt32(0),
                                     DateBook = reader.GetDateTime(1).ToString("yyyy-MM-dd"), // Assuming DateBook is DateTime in the database
                                     StatusBooking = reader.GetString(2),
-                                    PhonePassenger = reader.GetString(3),
+                                    TickitPrice = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
+                                    SeatsBooking = reader.IsDBNull(4) ? 0 : reader.GetInt32(4) ,
+                                    PhonePassenger = reader.GetString(5),
                                     // Assuming JourneyId is the fourth column
-                                    JourneyoBo = GetJourneyById(reader.GetInt32(4))
+                                    JourneyoBo = GetJourneyById(reader.GetInt32(6))
                                 };
 
                                 bookings.Add(booking);

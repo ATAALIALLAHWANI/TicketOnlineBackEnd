@@ -8,6 +8,7 @@
 
         public string DepartuerJourney { set; get; }
 
+
         public string DestinationJourney { set; get; }
 
         public string DateJourney { set; get; } 

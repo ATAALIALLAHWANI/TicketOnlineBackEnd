@@ -8,6 +8,10 @@
 
         public string StatusBooking { get; set; } 
 
+        public double TickitPrice { get; set; }
+
+        public int SeatsBooking { get; set; }
+
         public string PhonePassenger { get; set; }
         
         public Journey JourneyoBo { get; set; } 

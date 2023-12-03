@@ -33,7 +33,7 @@ namespace TicketOnline.Controllers
                     using (var command = new SqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@RouteJourney", journeyDto.RouteJourney);
-                        command.Parameters.AddWithValue("@DepartuerJourney", journeyDto.DepartuerJourney);
+                        command.Parameters.AddWithValue("@DepartuerJourney", DateTime.Parse(journeyDto.DepartuerJourney));
                         command.Parameters.AddWithValue("@DestinationJourney", journeyDto.DestinationJourney);
                         command.Parameters.AddWithValue("@DateJourney", DateTime.Parse(journeyDto.DateJourney)); // Assuming you want to parse the string to DateTime
                         command.Parameters.AddWithValue("@NumberBus", journeyDto.NumberBus);
@@ -76,9 +76,9 @@ public IActionResult GetAllJoureny()
                         {
                             IdJourney = reader.GetInt32(0),
                             RouteJourney = reader.IsDBNull(1) ? null : reader.GetString(1),
-                            DepartuerJourney = reader.IsDBNull(2) ? null : reader.GetString(2),
-                            DestinationJourney = reader.IsDBNull(3) ? null : reader.GetString(3),
-                             DateJourney = reader.IsDBNull(4) ? null : reader.GetDateTime(4).ToString("yyyy-MM-dd"),
+                            DepartuerJourney = reader.GetTimeSpan(2).ToString(@"hh\:mm"),
+                                DestinationJourney = reader.IsDBNull(3) ? null : reader.GetString(3),
+                            DateJourney = reader.GetDateTime(4).ToString("yyyy-MM-dd"),
                             NumberBus = reader.GetInt32(5),
                             BusID = reader.GetInt32(6)
                         };
