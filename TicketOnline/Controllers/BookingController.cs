@@ -2,6 +2,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using TicketOnline.Models;
+using System.Security.Cryptography;
+using System.Text;
+using Newtonsoft.Json;
 
 namespace TicketOnline.Controllers
 {
@@ -11,10 +14,28 @@ namespace TicketOnline.Controllers
     {
         private readonly string connectionString;
 
+        private readonly string FilesDirectory = "Files";
+        private readonly string JsonFileExist = Path.Combine("Files", "data.json");
+        List<QrCode> existingJson = new List<QrCode>();
+        //QrCode obj = null;
         public BookingController(IConfiguration configuration)
         {
             connectionString = configuration.GetConnectionString("SqlServerDb") ?? "";
             Console.WriteLine($"ConnectionString: {connectionString}");
+
+
+            if (System.IO.File.Exists(JsonFileExist))
+            {
+                // Read the existing JSON content
+                var existingJsonContent = System.IO.File.ReadAllText(JsonFileExist);
+
+                // Deserialize the existing JSON into a list of JsonModel
+                existingJson = JsonConvert.DeserializeObject<List<QrCode>>(existingJsonContent);
+                existingJson = OrdringQrCode(existingJson);
+                // Get the JsonModel with the specified filename
+                //obj = GetFileD(existingJson, formData.FileName);
+            }
+
         }
 
         [HttpPost("AddBooking")]
@@ -22,6 +43,46 @@ namespace TicketOnline.Controllers
         {
             try
             {
+                QrCode jsonContent = new QrCode
+                {
+                    IdQrcode = 1,
+                    DateََQrCode = bookingDto.JourneyoBo.DateJourney + " " +bookingDto.JourneyoBo.DepartuerJourney,
+                    DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
+                    QrCodeList = new List<string>()
+
+                };
+
+                if (System.IO.File.Exists(JsonFileExist))
+                {
+                    bool flag = false;
+                    for (int  i = 0; i< existingJson.Count; i++)
+                    {
+                        if(existingJson[i].DateََQrCode.Equals(bookingDto.DateBook))
+                        {
+                          
+                            
+                            existingJson[i].QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
+                            flag = true;
+                            break;
+
+                        }
+                    }
+                    if (!flag)
+                    {
+                        jsonContent.QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
+                        existingJson.Add(jsonContent);
+                    }
+
+                }
+               
+                
+                
+
+                
+                System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
+
+                Console.WriteLine("file create sucssefuly");
+
                 using (var connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
@@ -31,7 +92,9 @@ namespace TicketOnline.Controllers
 
                     using (var command = new SqlCommand(sql, connection))
                     {
-                        command.Parameters.AddWithValue("@DateBook", DateTime.Now.ToString("yyyy-MM-dd")); // Assuming you want to parse the string to DateTime
+                        command.Parameters.AddWithValue("@DateBook", DateTime.Now.ToString("yyyy-MM-dd hh:mm"));
+                        Console.WriteLine($"Formatted Date: {DateTime.Now.ToString("yyyy-MM-dd hh:mm")}");
+                        // Assuming you want to parse the string to DateTime
                         command.Parameters.AddWithValue("@StatusBooking", bookingDto.StatusBooking);
                         command.Parameters.AddWithValue("@TickitPrice", bookingDto.TickitPrice);
                         command.Parameters.AddWithValue("@SeatsBooking", bookingDto.SeatsBooking);
@@ -77,10 +140,10 @@ namespace TicketOnline.Controllers
                                 Booking booking = new Booking
                                 {
                                     IdBooking = reader.GetInt32(0),
-                                    DateBook = reader.GetDateTime(1).ToString("yyyy-MM-dd"), // Assuming DateBook is DateTime in the database
+                                    DateBook = reader.GetDateTime(1).ToString("yyyy-MM-dd HH:mm"), // Use HH for 24-hour format
                                     StatusBooking = reader.GetString(2),
                                     TickitPrice = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
-                                    SeatsBooking = reader.IsDBNull(4) ? 0 : reader.GetInt32(4) ,
+                                    SeatsBooking = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
                                     PhonePassenger = reader.GetString(5),
                                     // Assuming JourneyId is the fourth column
                                     JourneyoBo = GetJourneyById(reader.GetInt32(6))
@@ -101,6 +164,69 @@ namespace TicketOnline.Controllers
             }
         }
 
+
+
+
+
+
+        [HttpGet("CheckQeCode")]
+        public bool CheckQrcode([FromQuery] string qrCode)
+        {
+            bool result = false;
+
+            if (existingJson != null && existingJson.Count > 0)
+            {
+                
+               
+                    if (existingJson[2].QrCodeList.Contains(qrCode))
+                    {
+                        result = true;
+                        
+                    }
+                
+            }
+
+            return result;
+        }
+
+
+
+        //helper
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public List<QrCode> OrdringQrCode(List <QrCode> qrCodes)
+        {
+            
+
+            
+            var orderedQrCodes = qrCodes.OrderBy(qrCode => DateTime.Parse(qrCode.DateََQrCode)).ToList();
+
+            return orderedQrCodes;
+        }
+
+
+        // helper 
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public  string GenerateUniqueValue(string passengerId)
+        {
+            // Get the current date and time
+            DateTime currentDateTime = DateTime.Now;
+
+            // Combine date and passenger ID
+            string dataToHash = $"{currentDateTime}{passengerId}";
+
+            // Hash the combined data to create a unique value using SHA-256
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                byte[] hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(dataToHash));
+                string hashedValue = BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
+                return hashedValue;
+            }
+        }
+
+       
+
+
+        //helper 
         [ApiExplorerSettings(IgnoreApi = true)]
         public Journey GetJourneyById(int id)
         {
@@ -124,9 +250,9 @@ namespace TicketOnline.Controllers
                                 {
                                     IdJourney = reader.GetInt32(0),
                                     RouteJourney = reader.IsDBNull(1) ? null : reader.GetString(1),
-                                    DepartuerJourney = reader.IsDBNull(2) ? null : reader.GetString(2),
+                                    DepartuerJourney = reader.GetTimeSpan(2).ToString(@"hh\:mm"),
                                     DestinationJourney = reader.IsDBNull(3) ? null : reader.GetString(3),
-                                    DateJourney = reader.IsDBNull(4) ? null : reader.GetDateTime(4).ToString("yyyy-MM-dd"),
+                                    DateJourney = reader.GetDateTime(4).ToString("yyyy-MM-dd"),
                                     NumberBus = reader.GetInt32(5),
                                     BusID = reader.GetInt32(6)
                                 };

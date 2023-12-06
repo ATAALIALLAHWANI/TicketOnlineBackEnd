@@ -155,6 +155,59 @@ namespace TicketOnline.Controllers
             }
         }
 
+        [HttpDelete("DeletePassengerById")]
+        public IActionResult DeletePassengerById([FromQuery] int id)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    // Check if the passenger with the given ID exists
+                    string checkSql = "SELECT COUNT(*) FROM Passenger WHERE IdPassenger = @IdPassenger;";
+
+                    using (var checkCommand = new SqlCommand(checkSql, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@IdPassenger", id);
+
+                        int passengerCount = (int)checkCommand.ExecuteScalar();
+
+                        if (passengerCount == 0)
+                        {
+                            // Passenger with the given ID does not exist
+                            return NotFound($"Passenger with ID {id} not found");
+                        }
+                    }
+
+                    // If the passenger exists, proceed with deletion
+                    string deleteSql = "DELETE FROM Passenger WHERE IdPassenger = @IdPassenger;";
+
+                    using (var deleteCommand = new SqlCommand(deleteSql, connection))
+                    {
+                        deleteCommand.Parameters.AddWithValue("@IdPassenger", id);
+
+                        int rowsAffected = deleteCommand.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            // Passenger deleted successfully
+                            return Ok($"Passenger with ID {id} deleted successfully");
+                        }
+                        else
+                        {
+                            // Deletion failed
+                            return BadRequest("Unable to delete the passenger");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("passenger", $"Sorry, but we have an exception: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+        }
 
 
     }
