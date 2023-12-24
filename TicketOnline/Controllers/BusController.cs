@@ -26,15 +26,17 @@ namespace TicketOnline.Controllers
                 {
                     connection.Open();
 
-                    string sql = "INSERT INTO Bus (CapacityBus, ModelBus, IdDriver , NumberBus)" +
-                                 "VALUES (@CapacityBus, @ModelBus, @IdDriver , @NumberBus);";
+                    string sql = "INSERT INTO Bus (CapacityBus, ModelBus, IdDriver, IdScanner, NumberBus)" +
+                        "VALUES (@CapacityBus, @ModelBus, @IdDriver, @IdScanner, @NumberBus);";
 
                     using (var command = new SqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@CapacityBus", busDto.CapacityBus);
                         command.Parameters.AddWithValue("@ModelBus", busDto.ModelBus);
                         command.Parameters.AddWithValue("@IdDriver", busDto.IdDriver);
+                        command.Parameters.AddWithValue("@IdScanner", busDto.IdScanner); // Add this line
                         command.Parameters.AddWithValue("@NumberBus", busDto.NumberBus);
+
                         command.ExecuteNonQuery();
                         connection.Close();
                     }
@@ -74,7 +76,8 @@ namespace TicketOnline.Controllers
                                     CapacityBus = reader.GetInt32(1),
                                     ModelBus = reader.IsDBNull(2) ? null : reader.GetString(2),
                                     IdDriver = reader.GetInt32(3),
-                                    NumberBus = reader.IsDBNull(4) ? 0 : reader.GetInt32(4)
+                                    IdScanner = reader.GetInt32(4),
+                                    NumberBus = reader.IsDBNull(5) ? 0 : reader.GetInt32(4)
                                 };
 
                                 buses.Add(bus);

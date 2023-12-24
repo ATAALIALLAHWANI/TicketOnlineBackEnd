@@ -31,7 +31,9 @@ namespace TicketOnline.Controllers
 
                 // Deserialize the existing JSON into a list of JsonModel
                 existingJson = JsonConvert.DeserializeObject<List<QrCode>>(existingJsonContent);
+                checkedEXpierDate();
                 existingJson = OrdringQrCode(existingJson);
+                
                 // Get the JsonModel with the specified filename
                 //obj = GetFileD(existingJson, formData.FileName);
             }
@@ -46,18 +48,23 @@ namespace TicketOnline.Controllers
                 QrCode jsonContent = new QrCode
                 {
                     IdQrcode = 1,
-                    DateََQrCode = bookingDto.JourneyoBo.DateJourney + " " +bookingDto.JourneyoBo.DepartuerJourney,
+                    DateََQrCode = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney,
                     DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
+                    IdScanner = GetIdScanner(bookingDto.JourneyoBo.BusID),
                     QrCodeList = new List<string>()
 
                 };
 
+
                 if (System.IO.File.Exists(JsonFileExist))
                 {
                     bool flag = false;
+                    string s = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
                     for (int  i = 0; i< existingJson.Count; i++)
                     {
-                        if(existingJson[i].DateََQrCode.Equals(bookingDto.DateBook))
+                       
+
+                        if (existingJson[i].DateََQrCode.Equals(s))
                         {
                           
                             
@@ -170,23 +177,90 @@ namespace TicketOnline.Controllers
 
 
         [HttpGet("CheckQeCode")]
-        public bool CheckQrcode([FromQuery] string qrCode)
+        public bool CheckQrcode([FromQuery] string qrCode, int IdScanner)
         {
             bool result = false;
 
             if (existingJson != null && existingJson.Count > 0)
             {
-                
-               
-                    if (existingJson[2].QrCodeList.Contains(qrCode))
+                for (int i = 0; i < existingJson.Count; i++)
+                {
+                    if (existingJson[i].QrCodeList.Contains(qrCode) && DateTime.Parse(existingJson[i].DateََQrCode) >= DateTime.Now && existingJson[i].IdScanner == IdScanner)
                     {
                         result = true;
-                        
+                        break; // You can exit the loop early since the condition is met
                     }
-                
+                }
             }
 
             return result;
+        }
+
+
+
+
+
+
+
+
+
+        //helper
+        [ApiExplorerSettings(IgnoreApi = true)]
+
+        public void checkedEXpierDate()
+        {
+
+            //for (int i = existingJson.Count - 1; i >= 0; i--)
+            //{
+            //    QrCode item = existingJson[i];
+            //    if (DateTime.Parse(item.DateََQrCode) < DateTime.Now)
+            //    {
+            //        existingJson.RemoveAt(i);
+            //    }
+            //}
+            //System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
+
+
+        }
+
+        //helper 
+
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public int GetIdScanner(int idBus)
+        {
+            int idScanner = 0;
+
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    string sql = $"SELECT IdScanner FROM Bus WHERE IdBus = @IdBus;";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@IdBus", idBus);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                idScanner = reader.GetInt32(0);
+                            }
+                        }
+                    }
+
+                    connection.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("bus", $"Sorry, but we have an exception: {ex.Message}");
+                Console.WriteLine(ModelState);
+            }
+
+            return idScanner;
         }
 
 
@@ -195,7 +269,7 @@ namespace TicketOnline.Controllers
         [ApiExplorerSettings(IgnoreApi = true)]
         public List<QrCode> OrdringQrCode(List <QrCode> qrCodes)
         {
-            
+ 
 
             
             var orderedQrCodes = qrCodes.OrderBy(qrCode => DateTime.Parse(qrCode.DateََQrCode)).ToList();
