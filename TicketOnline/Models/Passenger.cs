@@ -10,7 +10,8 @@ namespace TicketOnline.Models
         public string PassengerPhone { get; set; } 
         public string PassengerEmail { get; set; }
         public string PassengerPassword { get; set; }
-     
+
+        public int Blocked { get; set; } = 0;
 
 
     }

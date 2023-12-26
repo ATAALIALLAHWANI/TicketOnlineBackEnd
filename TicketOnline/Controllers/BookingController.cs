@@ -33,9 +33,7 @@ namespace TicketOnline.Controllers
                 existingJson = JsonConvert.DeserializeObject<List<QrCode>>(existingJsonContent);
                 checkedEXpierDate();
                 existingJson = OrdringQrCode(existingJson);
-                
-                // Get the JsonModel with the specified filename
-                //obj = GetFileD(existingJson, formData.FileName);
+
             }
 
         }
@@ -45,50 +43,57 @@ namespace TicketOnline.Controllers
         {
             try
             {
-                QrCode jsonContent = new QrCode
+                if (!bookingDto.StatusBooking.Equals("not pay"))
                 {
-                    IdQrcode = 1,
-                    DateََQrCode = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney,
-                    DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
-                    IdScanner = GetIdScanner(bookingDto.JourneyoBo.BusID),
-                    QrCodeList = new List<string>()
-
-                };
-
-
-                if (System.IO.File.Exists(JsonFileExist))
-                {
-                    bool flag = false;
-                    string s = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
-                    for (int  i = 0; i< existingJson.Count; i++)
+                    QrCode jsonContent = new QrCode
                     {
-                       
+                        IdQrcode = 1,
+                        DateََQrCode = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney,
+                        DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
+                        IdScanner = GetIdScanner(bookingDto.JourneyoBo.BusID),
+                        QrCodeList = new List<string>()
 
-                        if (existingJson[i].DateََQrCode.Equals(s))
+                    };
+
+
+                    if (System.IO.File.Exists(JsonFileExist))
+                    {
+
+                        bool flag = false;
+                        string s = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
+                        for (int i = 0; i < existingJson.Count; i++)
                         {
-                          
-                            
-                            existingJson[i].QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
-                            flag = true;
-                            break;
 
+
+                            if (existingJson[i].DateََQrCode.Equals(s))
+                            {
+
+
+                                existingJson[i].QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
+                                flag = true;
+                                break;
+
+                            }
                         }
+                        if (!flag)
+                        {
+                            jsonContent.QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
+                            existingJson.Add(jsonContent);
+                        }
+
+                        System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
+
+                        Console.WriteLine("file create sucssefuly");
                     }
-                    if (!flag)
-                    {
-                        jsonContent.QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
-                        existingJson.Add(jsonContent);
-                    }
+
+
 
                 }
-               
-                
-                
 
-                
-                System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
 
-                Console.WriteLine("file create sucssefuly");
+
+
+
 
                 using (var connection = new SqlConnection(connectionString))
                 {
@@ -174,7 +179,52 @@ namespace TicketOnline.Controllers
 
 
 
+        [HttpGet("GetBookingNotPay")]
+        public IActionResult GetBookingNotPay()
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
 
+                    string sql = "SELECT * FROM Booking WHERE StatusBooking = 'not pay';";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        using (var reader = command.ExecuteReader())
+                        {
+                            List<Booking> bookings = new List<Booking>();
+
+                            while (reader.Read())
+                            {
+                                Booking booking = new Booking
+                                {
+                                    IdBooking = reader.GetInt32(0),
+                                    DateBook = reader.GetDateTime(1).ToString("yyyy-MM-dd HH:mm"), // Use HH for 24-hour format
+                                    StatusBooking = reader.GetString(2),
+                                    TickitPrice = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
+                                    SeatsBooking = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                                    PhonePassenger = reader.GetString(5),
+                                    // Assuming JourneyId is the fourth column
+                                    JourneyoBo = GetJourneyById(reader.GetInt32(6))
+                                };
+
+                                bookings.Add(booking);
+                            }
+                            connection.Close();
+                            return Ok(bookings);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("booking", $"Sorry, but we have an exception: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+
+        }
 
         [HttpGet("CheckQeCode")]
         public bool CheckQrcode([FromQuery] string qrCode, int IdScanner)
@@ -185,9 +235,11 @@ namespace TicketOnline.Controllers
             {
                 for (int i = 0; i < existingJson.Count; i++)
                 {
-                    if (existingJson[i].QrCodeList.Contains(qrCode) && DateTime.Parse(existingJson[i].DateََQrCode) >= DateTime.Now && existingJson[i].IdScanner == IdScanner)
+                    if (existingJson[i].QrCodeList.Contains(qrCode) && existingJson[i].IdScanner == IdScanner)
                     {
                         result = true;
+                        existingJson[i].QrCodeList.Remove(qrCode);
+                        System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
                         break; // You can exit the loop early since the condition is met
                     }
                 }
@@ -209,16 +261,18 @@ namespace TicketOnline.Controllers
 
         public void checkedEXpierDate()
         {
+            DateTime currentDate = DateTime.Now;
 
-            //for (int i = existingJson.Count - 1; i >= 0; i--)
-            //{
-            //    QrCode item = existingJson[i];
-            //    if (DateTime.Parse(item.DateََQrCode) < DateTime.Now)
-            //    {
-            //        existingJson.RemoveAt(i);
-            //    }
-            //}
-            //System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
+            DateTime newDate = currentDate.AddMinutes(-30);
+            for (int i = existingJson.Count - 1; i >= 0; i--)
+            {
+                QrCode item = existingJson[i];
+                if (DateTime.Parse(item.DateََQrCode) <= newDate)
+                {
+                    existingJson.RemoveAt(i);
+                }
+            }
+            System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
 
 
         }

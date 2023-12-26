@@ -29,8 +29,8 @@ namespace TicketOnline.Controllers
                 {
                     connection.Open();
 
-                    string sql = "INSERT INTO Passenger (PassengerName, PassengerPhone, PassengerEmail, PassengerPassword)" +
-                                 "VALUES (@PassengerName, @PassengerPhone, @PassengerEmail, @PassengerPassword);";
+                    string sql = "INSERT INTO Passenger (PassengerName, PassengerPhone, PassengerEmail, PassengerPassword   )" +
+                                 "VALUES (@PassengerName, @PassengerPhone, @PassengerEmail, @PassengerPassword   );";
 
                     using (var command = new SqlCommand(sql, connection))
                     {
@@ -80,7 +80,7 @@ namespace TicketOnline.Controllers
                                 passenger.PassengerPhone = reader.GetString(2);
                                 passenger.PassengerEmail = reader.GetString(3);
                                 passenger.PassengerPassword = reader.GetString(4); // Assuming password is stored as a string, adapt accordingly
-                                                                                   // Add other properties as needed
+                                passenger.Blocked = reader.IsDBNull(5) ? 0 : reader.GetInt32(5);                                        // Add other properties as needed
 
                                 passengers.Add(passenger);
                             }
@@ -97,6 +97,64 @@ namespace TicketOnline.Controllers
 
             return Ok(passengers);
         }
+
+        [HttpGet("AddBlocked")]
+        public IActionResult AddBlocked(string phoneNumber)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT IdPassenger, blocked FROM Passenger WHERE PassengerPhone = @PhoneNumber;";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                int idPassenger = reader.GetInt32(0);
+                                int currentBlockedCount = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+
+                                // Increment the blocked count by 1
+                                int newBlockedCount = currentBlockedCount + 1;
+
+                                // Close the first using block
+                                connection.Close();
+                                connection.Open();
+
+                                // Update the database with the new blocked count
+                                string updateSql = "UPDATE Passenger SET blocked = @NewBlockedCount WHERE IdPassenger = @IdPassenger;";
+                                using (var updateCommand = new SqlCommand(updateSql, connection))
+                                {
+                                    updateCommand.Parameters.AddWithValue("@NewBlockedCount", newBlockedCount);
+                                    updateCommand.Parameters.AddWithValue("@IdPassenger", idPassenger);
+                                    updateCommand.ExecuteNonQuery();
+                                }
+
+                                // Close the second using block
+                                connection.Close();
+
+                                return Ok("Blocked count updated successfully");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("passenger", $"Sorry, but we have an exception: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+
+            return BadRequest("Passenger not found");
+        }
+
+
 
         [HttpGet("CheckPassenger")]
         public IActionResult CheckPassenger([FromQuery] string email, [FromQuery] string password)
