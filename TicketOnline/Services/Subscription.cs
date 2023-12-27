@@ -11,7 +11,15 @@ namespace TicketOnline.Services
             connectionString = configuration.GetConnectionString("SqlServerDb") ?? "";
             Console.WriteLine($"ConnectionString: {connectionString}");
         }
-            public void Getbooking (string Message)
+
+
+        public void Update(string Message)
+        {
+            throw new NotImplementedException();
+        }
+
+
+        public void Getbooking (string Message)
         {
 
             try
@@ -109,10 +117,7 @@ namespace TicketOnline.Services
         }
 
 
-        public void Update(string Message)
-        {
-            throw new NotImplementedException();
-        }
+       
 
 
     }

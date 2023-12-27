@@ -43,12 +43,24 @@ namespace TicketOnline.Controllers
         {
             try
             {
+                DateTime currentDate = DateTime.Now;
+
+                DateTime newDate = currentDate.AddMinutes(10);
+               
+                string DateJourney = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
+                if (GetBlocked(bookingDto.PhonePassenger) >= 3) return Ok("this passenger is blocked ");
+
+                if (DateTime.Parse(DateJourney) <= newDate) return BadRequest("this booking is not true the date the journy is end cannot resrvation this booking  ");
+
+             
+               
+
                 if (!bookingDto.StatusBooking.Equals("not pay"))
                 {
                     QrCode jsonContent = new QrCode
                     {
                         IdQrcode = 1,
-                        DateََQrCode = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney,
+                        DateََQrCode = DateJourney,
                         DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
                         IdScanner = GetIdScanner(bookingDto.JourneyoBo.BusID),
                         QrCodeList = new List<string>()
@@ -252,7 +264,40 @@ namespace TicketOnline.Controllers
 
 
 
+        //helper
+        [ApiExplorerSettings(IgnoreApi = true)]
 
+        public int GetBlocked(string phoneNumber)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT blocked FROM Passenger WHERE PassengerPhone = @PhoneNumber;";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
+
+                        var result = command.ExecuteScalar();
+
+                        // Check if the result is not null
+                        if (result != null && result != DBNull.Value)
+                        {
+                            return Convert.ToInt32(result);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while getting the blocked count: {ex.Message}");
+            }
+
+            return 0; // Return 0 if the passenger is not found or blocked count is not available
+        }
 
 
 
