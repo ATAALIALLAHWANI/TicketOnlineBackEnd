@@ -17,7 +17,7 @@ namespace TicketOnline.Controllers
         private readonly string FilesDirectory = "Files";
         private readonly string JsonFileExist = Path.Combine("Files", "data.json");
         List<QrCode> existingJson = new List<QrCode>();
-        //QrCode obj = null;
+       
         public BookingController(IConfiguration configuration)
         {
             connectionString = configuration.GetConnectionString("SqlServerDb") ?? "";
@@ -29,10 +29,7 @@ namespace TicketOnline.Controllers
                 // Read the existing JSON content
                 var existingJsonContent = System.IO.File.ReadAllText(JsonFileExist);
 
-                // Deserialize the existing JSON into a list of JsonModel
                 existingJson = JsonConvert.DeserializeObject<List<QrCode>>(existingJsonContent);
-                checkedEXpierDate();
-                existingJson = OrdringQrCode(existingJson);
 
             }
 
@@ -46,14 +43,14 @@ namespace TicketOnline.Controllers
                 DateTime currentDate = DateTime.Now;
 
                 DateTime newDate = currentDate.AddMinutes(10);
-               
-                string DateJourney = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
+                 string DateJourney = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
                 if (GetBlocked(bookingDto.PhonePassenger) >= 3) return Ok("this passenger is blocked ");
 
                 if (DateTime.Parse(DateJourney) <= newDate) return BadRequest("this booking is not true the date the journy is end cannot resrvation this booking  ");
 
-             
-               
+
+                string symblo = "noqrcode";
+
 
                 if (!bookingDto.StatusBooking.Equals("not pay"))
                 {
@@ -73,6 +70,7 @@ namespace TicketOnline.Controllers
 
                         bool flag = false;
                         string s = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
+                        symblo = GenerateUniqueValue(bookingDto.PhonePassenger);
                         for (int i = 0; i < existingJson.Count; i++)
                         {
 
@@ -81,7 +79,7 @@ namespace TicketOnline.Controllers
                             {
 
 
-                                existingJson[i].QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
+                                existingJson[i].QrCodeList.Add(symblo);
                                 flag = true;
                                 break;
 
@@ -89,7 +87,7 @@ namespace TicketOnline.Controllers
                         }
                         if (!flag)
                         {
-                            jsonContent.QrCodeList.Add(GenerateUniqueValue(bookingDto.PhonePassenger));
+                            jsonContent.QrCodeList.Add(symblo);
                             existingJson.Add(jsonContent);
                         }
 
@@ -133,7 +131,7 @@ namespace TicketOnline.Controllers
                     }
                 }
 
-                return Ok("Booking created successfully");
+                return Ok(symblo);
             }
             catch (Exception ex)
             {
@@ -261,7 +259,55 @@ namespace TicketOnline.Controllers
         }
 
 
+        [HttpGet("AcceptPay")]
+        public IActionResult AcceptPay([FromQuery] string phoneNumber)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
 
+                    // Check if a booking with the given phone number exists
+                    string bookingSql = "SELECT IdBooking FROM Booking WHERE PhonePassenger = @PhoneNumber ;";
+                    using (var bookingCommand = new SqlCommand(bookingSql, connection))
+                    {
+                        bookingCommand.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
+                        
+
+                        
+                        using (var bookingReader = bookingCommand.ExecuteReader())
+                        {
+
+                            if (bookingReader.Read())
+                            {
+                                int bookingId = bookingReader.GetInt32(0);
+                                connection.Close();
+                                connection.Open();
+                                // Update the booking status to "pay"
+                                string updateBookingSql = "UPDATE Booking SET StatusBooking = 'pay' WHERE IdBooking = @BookingId;";
+                                using (var updateBookingCommand = new SqlCommand(updateBookingSql, connection))
+                                {
+                                    updateBookingCommand.Parameters.AddWithValue("@BookingId", bookingId);
+                                    updateBookingCommand.ExecuteNonQuery();
+
+                                    connection.Close();
+                                    return Ok("Booking status updated to 'pay' successfully");
+                                }
+                            }
+                        }
+                    }
+
+                    connection.Close();
+                    return BadRequest("No pending booking found for the given phone number");
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("booking", $"Sorry, but we have an exception: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+        }
 
 
         //helper
@@ -301,26 +347,7 @@ namespace TicketOnline.Controllers
 
 
 
-        //helper
-        [ApiExplorerSettings(IgnoreApi = true)]
-
-        public void checkedEXpierDate()
-        {
-            DateTime currentDate = DateTime.Now;
-
-            DateTime newDate = currentDate.AddMinutes(-30);
-            for (int i = existingJson.Count - 1; i >= 0; i--)
-            {
-                QrCode item = existingJson[i];
-                if (DateTime.Parse(item.DateََQrCode) <= newDate)
-                {
-                    existingJson.RemoveAt(i);
-                }
-            }
-            System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
-
-
-        }
+       
 
         //helper 
 
@@ -364,17 +391,7 @@ namespace TicketOnline.Controllers
 
 
 
-        //helper
-        [ApiExplorerSettings(IgnoreApi = true)]
-        public List<QrCode> OrdringQrCode(List <QrCode> qrCodes)
-        {
- 
-
-            
-            var orderedQrCodes = qrCodes.OrderBy(qrCode => DateTime.Parse(qrCode.DateََQrCode)).ToList();
-
-            return orderedQrCodes;
-        }
+       
 
 
         // helper 

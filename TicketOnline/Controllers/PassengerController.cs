@@ -136,8 +136,24 @@ namespace TicketOnline.Controllers
                                     updateCommand.ExecuteNonQuery();
                                 }
 
+
+
                                 // Close the second using block
                                 connection.Close();
+
+                                connection.Open();
+                                // Delete bookings associated with the passenger
+                                string deleteBookingSql = "DELETE FROM Booking WHERE PhonePassenger = @PhoneNumber;";
+                                using (var deleteBookingCommand = new SqlCommand(deleteBookingSql, connection))
+                                {
+                                    deleteBookingCommand.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
+                                    deleteBookingCommand.ExecuteNonQuery();
+                                }
+
+                                // Close the second using block
+                                connection.Close();
+
+
 
                                 return Ok("Blocked count updated successfully");
                             }

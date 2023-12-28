@@ -1,4 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using TicketOnline.Models;
 
 namespace TicketOnline.Services
 {
@@ -7,8 +9,10 @@ namespace TicketOnline.Services
 
         private readonly IServiceProvider services;
 
+
         public BlockedRemovalService(IServiceProvider services)
         {
+            
             this.services = services;
         }
 
@@ -25,8 +29,9 @@ namespace TicketOnline.Services
 
             }
         }
-
-
+       
+      
+     
         private void RemoveBlockedPassengers()
         {
             try
