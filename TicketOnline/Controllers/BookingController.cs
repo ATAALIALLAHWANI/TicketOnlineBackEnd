@@ -49,62 +49,6 @@ namespace TicketOnline.Controllers
                 if (DateTime.Parse(DateJourney) <= newDate) return BadRequest("this booking is not true the date the journy is end cannot resrvation this booking  ");
 
 
-                string symblo = "noqrcode";
-
-
-                if (!bookingDto.StatusBooking.Equals("not pay"))
-                {
-                    QrCode jsonContent = new QrCode
-                    {
-                        IdQrcode = 1,
-                        DateََQrCode = DateJourney,
-                        DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
-                        IdScanner = GetIdScanner(bookingDto.JourneyoBo.BusID),
-                        QrCodeList = new List<string>()
-
-                    };
-
-
-                    if (System.IO.File.Exists(JsonFileExist))
-                    {
-
-                        bool flag = false;
-                        string s = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
-                        symblo = GenerateUniqueValue(bookingDto.PhonePassenger);
-                        for (int i = 0; i < existingJson.Count; i++)
-                        {
-
-
-                            if (existingJson[i].DateََQrCode.Equals(s))
-                            {
-
-
-                                existingJson[i].QrCodeList.Add(symblo);
-                                flag = true;
-                                break;
-
-                            }
-                        }
-                        if (!flag)
-                        {
-                            jsonContent.QrCodeList.Add(symblo);
-                            existingJson.Add(jsonContent);
-                        }
-
-                        System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
-
-                        Console.WriteLine("file create sucssefuly");
-                    }
-
-
-
-                }
-
-
-
-
-
-
                 using (var connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
@@ -131,7 +75,7 @@ namespace TicketOnline.Controllers
                     }
                 }
 
-                return Ok(symblo);
+                return Ok("successfully create Booking ");
             }
             catch (Exception ex)
             {
@@ -236,7 +180,7 @@ namespace TicketOnline.Controllers
 
         }
 
-        [HttpGet("CheckQeCode")]
+        [HttpPost("CheckQeCode")]
         public bool CheckQrcode([FromQuery] string qrCode, int IdScanner)
         {
             bool result = false;
@@ -258,7 +202,6 @@ namespace TicketOnline.Controllers
             return result;
         }
 
-
         [HttpGet("AcceptPay")]
         public IActionResult AcceptPay([FromQuery] string phoneNumber)
         {
@@ -269,16 +212,13 @@ namespace TicketOnline.Controllers
                     connection.Open();
 
                     // Check if a booking with the given phone number exists
-                    string bookingSql = "SELECT IdBooking FROM Booking WHERE PhonePassenger = @PhoneNumber ;";
+                    string bookingSql = "SELECT IdBooking FROM Booking WHERE PhonePassenger = @PhoneNumber;";
                     using (var bookingCommand = new SqlCommand(bookingSql, connection))
                     {
                         bookingCommand.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
-                        
 
-                        
                         using (var bookingReader = bookingCommand.ExecuteReader())
                         {
-
                             if (bookingReader.Read())
                             {
                                 int bookingId = bookingReader.GetInt32(0);
@@ -290,17 +230,63 @@ namespace TicketOnline.Controllers
                                 {
                                     updateBookingCommand.Parameters.AddWithValue("@BookingId", bookingId);
                                     updateBookingCommand.ExecuteNonQuery();
+                                }
 
-                                    connection.Close();
-                                    return Ok("Booking status updated to 'pay' successfully");
+                                // Retrieve the booking details
+                                Booking bookingDto = GetBookingId(bookingId);
+
+                                if (bookingDto != null)
+                                {
+                                    string dateJourney = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
+                                    QrCode jsonContent = new QrCode
+                                    {
+                                        IdQrcode = 1,
+                                        DateََQrCode = dateJourney,
+                                        DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
+                                        IdScanner = GetIdScanner(bookingDto.JourneyoBo.BusID),
+                                        QrCodeList = new List<string>()
+                                    };
+
+                                    if (System.IO.File.Exists(JsonFileExist))
+                                    {
+                                        string symbol = GenerateUniqueValue(bookingDto.PhonePassenger);
+
+                                        bool flag = false;
+
+                                        // Ensure synchronization when reading and writing to existingJson
+                                        lock (existingJson)
+                                        {
+                                            foreach (var existingEntry in existingJson)
+                                            {
+                                                if (existingEntry.DateََQrCode.Equals(dateJourney))
+                                                {
+                                                    existingEntry.QrCodeList.Add(symbol);
+                                                    flag = true;
+                                                    break;
+                                                }
+                                            }
+
+                                            if (!flag)
+                                            {
+                                                jsonContent.QrCodeList.Add(symbol);
+                                                existingJson.Add(jsonContent);
+                                            }
+
+                                            // Write back the modified list to the file
+                                            System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
+                                        }
+
+                                        Console.WriteLine("File created successfully");
+                                        connection.Close();
+                                        return Ok(symbol);
+                                    }
                                 }
                             }
                         }
                     }
-
-                    connection.Close();
-                    return BadRequest("No pending booking found for the given phone number");
                 }
+
+                return BadRequest("No pending booking found for the given phone number");
             }
             catch (Exception ex)
             {
@@ -308,6 +294,51 @@ namespace TicketOnline.Controllers
                 return BadRequest(ModelState);
             }
         }
+
+
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public Booking GetBookingId(int id)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT * FROM Booking WHERE IdBooking = @IdBooking;";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@IdBooking", id);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new Booking
+                                {
+                                    IdBooking = reader.GetInt32(0),
+                                    DateBook = reader.GetDateTime(1).ToString("yyyy-MM-dd hh:mm"), // Assuming DateBook is DateTime in the database
+                                    StatusBooking = reader.GetString(2),
+                                    TickitPrice = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
+                                    SeatsBooking = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                                    PhonePassenger = reader.GetString(5),
+                                    JourneyoBo = GetJourneyById(reader.GetInt32(6))
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle exception, e.g., log it or throw a custom exception
+                Console.WriteLine($"An error occurred while fetching Booking by ID: {ex.Message}");
+            }
+
+            return null; // Return null if Booking with the specified ID is not found
+        }
+
 
 
         //helper

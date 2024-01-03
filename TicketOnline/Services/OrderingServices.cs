@@ -1,31 +1,35 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using TicketOnline.Models;
 
 namespace TicketOnline.Services
 {
     public class OrderingServices : BackgroundService
     {
-
-        private readonly IServiceProvider services;
-
-
-
         private readonly string FilesDirectory = "Files";
         private readonly string JsonFileExist = Path.Combine("Files", "data.json");
-        List<QrCode> existingJson = new List<QrCode>();
-        public OrderingServices(IServiceProvider services)
+        private readonly List<QrCode> existingJson;
+
+        public OrderingServices()
         {
-            if (System.IO.File.Exists(JsonFileExist))
+            if (File.Exists(JsonFileExist))
             {
                 // Read the existing JSON content
-                var existingJsonContent = System.IO.File.ReadAllText(JsonFileExist);
+                var existingJsonContent = File.ReadAllText(JsonFileExist);
 
-                // Deserialize the existing JSON into a list of JsonModel
-                existingJson = JsonConvert.DeserializeObject<List<QrCode>>(existingJsonContent);
-              
-
+                // Deserialize the existing JSON into a list of QrCode
+                existingJson = JsonConvert.DeserializeObject<List<QrCode>>(existingJsonContent) ?? new List<QrCode>();
             }
-            this.services = services;
+            else
+            {
+                existingJson = new List<QrCode>();
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -33,41 +37,59 @@ namespace TicketOnline.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 // Run your logic here
-                eckedEXpierDate();
-                existingJson = OrdringQrCode(existingJson);
+                CheckExpireDate();
+                
 
-                // Wait for one week before running again
-
-                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);  // await Task.Delay(TimeSpan.FromDays(7), stoppingToken);
+                // Wait for one minute before running again
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
             }
         }
 
-        public List<QrCode> OrdringQrCode(List<QrCode> qrCodes)
+        //public void OrdringQrCode()
+        //{
+        //    try
+        //    {
+        //        var orderedQrCodes = existingJson.OrderBy(qrCode => DateTime.Parse(qrCode.DateََQrCode)).ToList();
+        //        File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(orderedQrCodes));
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        // Handle or log the exception
+        //        Console.WriteLine($"An error occurred while ordering QR codes: {ex.Message}");
+        //    }
+        //}
+
+        public void CheckExpireDate()
         {
-
-
-            var orderedQrCodes = qrCodes.OrderBy(qrCode => DateTime.Parse(qrCode.DateََQrCode)).ToList();
-
-            return orderedQrCodes;
-        }
-
-
-        public void eckedEXpierDate()
-        {
-            DateTime currentDate = DateTime.Now;
-
-            DateTime newDate = currentDate.AddMinutes(-30);
-            for (int i = existingJson.Count - 1; i >= 0; i--)
+            try
             {
-                QrCode item = existingJson[i];
-                if (DateTime.Parse(item.DateََQrCode) <= newDate)
+                DateTime currentDate = DateTime.Now;
+                DateTime newDate = currentDate.AddMinutes(-30);
+
+                // Ensure synchronization when reading and writing to existingJson
+                lock (existingJson)
                 {
-                    existingJson.RemoveAt(i);
+                    for (int i = existingJson.Count - 1; i >= 0; i--)
+                    {
+                        QrCode item = existingJson[i];
+
+                        // Ensure that the date parsing doesn't throw an exception
+                        if (DateTime.TryParse(item.DateََQrCode, out DateTime itemDate) && itemDate <= newDate)
+                        {
+                            existingJson.RemoveAt(i);
+                        }
+                    }
+
+                    // Write back the modified list to the file
+                    File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
                 }
             }
-            System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
-
-
+            catch (Exception ex)
+            {
+                // Handle or log the exception
+                Console.WriteLine($"An error occurred while checking and updating expiration dates: {ex.Message}");
+            }
         }
+
     }
 }
