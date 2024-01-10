@@ -5,6 +5,7 @@ using TicketOnline.Models;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
+using TicketOnline.Repository;
 
 namespace TicketOnline.Controllers
 {
@@ -13,7 +14,7 @@ namespace TicketOnline.Controllers
     public class BookingController : ControllerBase
     {
         private readonly string connectionString;
-
+         SaveQrcodePassenger saveQrcodePassenger;
         private readonly string FilesDirectory = "Files";
         private readonly string JsonFileExist = Path.Combine("Files", "data.json");
         List<QrCode> existingJson = new List<QrCode>();
@@ -22,7 +23,7 @@ namespace TicketOnline.Controllers
         {
             connectionString = configuration.GetConnectionString("SqlServerDb") ?? "";
             Console.WriteLine($"ConnectionString: {connectionString}");
-
+            saveQrcodePassenger = new SaveQrcodePassenger(connectionString);
 
             if (System.IO.File.Exists(JsonFileExist))
             {
@@ -189,8 +190,9 @@ namespace TicketOnline.Controllers
             {
                 for (int i = 0; i < existingJson.Count; i++)
                 {
-                    if (existingJson[i].QrCodeList.Contains(qrCode) && existingJson[i].IdScanner == IdScanner)
+                    if (existingJson[i].QrCodeList.Contains(qrCode) && existingJson[i].IdScanner == IdScanner )
                     {
+                      
                         result = true;
                         existingJson[i].QrCodeList.Remove(qrCode);
                         System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
@@ -212,7 +214,7 @@ namespace TicketOnline.Controllers
                     connection.Open();
 
                     // Check if a booking with the given phone number exists
-                    string bookingSql = "SELECT IdBooking FROM Booking WHERE PhonePassenger = @PhoneNumber;";
+                    string bookingSql = "SELECT IdBooking FROM Booking WHERE PhonePassenger = @PhoneNumber AND StatusBooking = 'not pay';";
                     using (var bookingCommand = new SqlCommand(bookingSql, connection))
                     {
                         bookingCommand.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
@@ -231,6 +233,9 @@ namespace TicketOnline.Controllers
                                     updateBookingCommand.Parameters.AddWithValue("@BookingId", bookingId);
                                     updateBookingCommand.ExecuteNonQuery();
                                 }
+
+                                
+
 
                                 // Retrieve the booking details
                                 Booking bookingDto = GetBookingId(bookingId);
@@ -271,14 +276,14 @@ namespace TicketOnline.Controllers
                                                 jsonContent.QrCodeList.Add(symbol);
                                                 existingJson.Add(jsonContent);
                                             }
-
+                                            saveQrcodePassenger.SavePassangerQrcodeToDatabase(phoneNumber, symbol);
                                             // Write back the modified list to the file
                                             System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
                                         }
 
                                         Console.WriteLine("File created successfully");
                                         connection.Close();
-                                        return Ok(symbol);
+                                        return Ok("ok is don payment");
                                     }
                                 }
                             }
@@ -294,6 +299,45 @@ namespace TicketOnline.Controllers
                 return BadRequest(ModelState);
             }
         }
+
+        [HttpGet("GetAllPassengerQrcode")]
+        public IActionResult GetAllPassengerQrcode([FromQuery] string PhoneNumber)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT PassQrCode FROM PassengerQrCode WHERE PassengerPhone = @PhoneNumber;";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@PhoneNumber", PhoneNumber);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            List<string> qrCodes = new List<string>();
+
+                            while (reader.Read())
+                            {
+                                string qrCode = reader.GetString(0);
+                                qrCodes.Add(qrCode);
+                            }
+
+                            connection.Close();
+                            return Ok(qrCodes);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("passengerQrcode", $"Sorry, but we have an exception: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+        }
+
 
 
         [ApiExplorerSettings(IgnoreApi = true)]

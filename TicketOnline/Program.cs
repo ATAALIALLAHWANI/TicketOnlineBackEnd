@@ -12,7 +12,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHostedService<BlockedRemovalService>();
 builder.Services.AddHostedService<OrderingServices>();
-
+string url = Networking.GenerateUrl();
+//if (!string.IsNullOrEmpty(url))
+//{
+    builder.WebHost.UseUrls(url);
+//}
+Console.WriteLine(url);
 
 builder.Services.AddCors(policyBuilder =>
   policyBuilder.AddDefaultPolicy(policy =>
@@ -34,9 +39,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
-app.UseAuthorization();
+//app.UseAuthorization();
 
 app.MapControllers();
 
