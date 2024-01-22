@@ -98,8 +98,8 @@ namespace TicketOnline.Controllers
             return Ok(passengers);
         }
 
-        [HttpGet("AddBlocked")]
-        public IActionResult AddBlocked(string phoneNumber)
+        [HttpPut("AddBlocked")]
+        public IActionResult AddBlocked([FromQuery]string phoneNumber ,[FromQuery] int IdBooking)
         {
             try
             {
@@ -143,10 +143,10 @@ namespace TicketOnline.Controllers
 
                                 connection.Open();
                                 // Delete bookings associated with the passenger
-                                string deleteBookingSql = "DELETE FROM Booking WHERE PhonePassenger = @PhoneNumber;";
+                                string deleteBookingSql = "DELETE FROM Booking WHERE IdBooking = @IdBooking And StatusBooking = 'not pay';";
                                 using (var deleteBookingCommand = new SqlCommand(deleteBookingSql, connection))
                                 {
-                                    deleteBookingCommand.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
+                                    deleteBookingCommand.Parameters.AddWithValue("@IdBooking", IdBooking);
                                     deleteBookingCommand.ExecuteNonQuery();
                                 }
 
@@ -228,6 +228,56 @@ namespace TicketOnline.Controllers
                 return BadRequest(ModelState);
             }
         }
+
+        [HttpPost("GetPassengersUsingPass")]
+        public IActionResult GetPassengersUsingPass([FromQuery] string email, [FromQuery] string password)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT * FROM Passenger WHERE PassengerEmail = @Email AND PassengerPassword = @Password";
+
+                    using (var command = new SqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@Email", email);
+                        command.Parameters.AddWithValue("@Password", password);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                // Assuming Passenger has properties that match the columns in the query
+                                Passenger passenger = new Passenger
+                                {
+                                    IdPassenger = reader.GetInt32(reader.GetOrdinal("IdPassenger")), // Replace with the actual column name
+                                    PassengerName = reader.GetString(reader.GetOrdinal("PassengerName")),
+                                    PassengerPhone = reader.GetString(reader.GetOrdinal("PassengerPhone")),
+                                    PassengerEmail = reader.GetString(reader.GetOrdinal("PassengerEmail")),
+                                    PassengerPassword = reader.GetString(reader.GetOrdinal("PassengerPassword")), // Assuming password is stored as a string, adapt accordingly
+                                    Blocked = reader.IsDBNull(reader.GetOrdinal("Blocked")) ? 0 : reader.GetInt32(reader.GetOrdinal("Blocked")),
+                                    // Set other properties accordingly
+                                };
+
+                                connection.Close();
+                                return Ok(passenger);
+                            }
+                        }
+                    }
+                }
+
+                // Return NotFound if no matching passenger is found
+                return NotFound();
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("passenger", $"Sorry, but we have an exception: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+        }
+
 
         [HttpDelete("DeletePassengerById")]
         public IActionResult DeletePassengerById([FromQuery] int id)

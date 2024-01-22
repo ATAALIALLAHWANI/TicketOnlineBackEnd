@@ -6,24 +6,46 @@ using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
 using TicketOnline.Repository;
+using Microsoft.Azure.Cosmos;
 
 namespace TicketOnline.Controllers
 {
+
+
+    class helloTest
+    {
+        public helloTest(string id, string hello)
+        {
+            this.id = id;
+            this.helloHello = hello;
+        }
+        public string id { get; set; }
+
+        public string helloHello { get; set; }
+
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     public class BookingController : ControllerBase
     {
         private readonly string connectionString;
-         SaveQrcodePassenger saveQrcodePassenger;
+        NotificationRepository notificationRepository;
+        SaveQrcodePassenger saveQrcodePassenger;
         private readonly string FilesDirectory = "Files";
         private readonly string JsonFileExist = Path.Combine("Files", "data.json");
         List<QrCode> existingJson = new List<QrCode>();
-       
+
+
+        //
+      
+
         public BookingController(IConfiguration configuration)
         {
             connectionString = configuration.GetConnectionString("SqlServerDb") ?? "";
             Console.WriteLine($"ConnectionString: {connectionString}");
             saveQrcodePassenger = new SaveQrcodePassenger(connectionString);
+            notificationRepository = new NotificationRepository(connectionString);
 
             if (System.IO.File.Exists(JsonFileExist))
             {
@@ -43,9 +65,9 @@ namespace TicketOnline.Controllers
             {
                 DateTime currentDate = DateTime.Now;
 
-                DateTime newDate = currentDate.AddMinutes(10);
+                DateTime newDate = currentDate.AddMinutes(5);
                  string DateJourney = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
-                if (GetBlocked(bookingDto.PhonePassenger) >= 3) return Ok("this passenger is blocked ");
+                if (GetBlocked(bookingDto.PhonePassenger) >= 3) return BadRequest("this passenger is blocked ");
 
                 if (DateTime.Parse(DateJourney) <= newDate) return BadRequest("this booking is not true the date the journy is end cannot resrvation this booking  ");
 
@@ -204,28 +226,17 @@ namespace TicketOnline.Controllers
             return result;
         }
 
-        [HttpGet("AcceptPay")]
-        public IActionResult AcceptPay([FromQuery] string phoneNumber)
+        [HttpPut("AcceptPay")]
+        public async Task<IActionResult> AcceptPay([FromQuery] int IdBooking)
         {
             try
             {
+                int bookingId = IdBooking;
                 using (var connection = new SqlConnection(connectionString))
                 {
-                    connection.Open();
-
-                    // Check if a booking with the given phone number exists
-                    string bookingSql = "SELECT IdBooking FROM Booking WHERE PhonePassenger = @PhoneNumber AND StatusBooking = 'not pay';";
-                    using (var bookingCommand = new SqlCommand(bookingSql, connection))
-                    {
-                        bookingCommand.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
-
-                        using (var bookingReader = bookingCommand.ExecuteReader())
-                        {
-                            if (bookingReader.Read())
-                            {
-                                int bookingId = bookingReader.GetInt32(0);
-                                connection.Close();
+                      
                                 connection.Open();
+
                                 // Update the booking status to "pay"
                                 string updateBookingSql = "UPDATE Booking SET StatusBooking = 'pay' WHERE IdBooking = @BookingId;";
                                 using (var updateBookingCommand = new SqlCommand(updateBookingSql, connection))
@@ -234,61 +245,79 @@ namespace TicketOnline.Controllers
                                     updateBookingCommand.ExecuteNonQuery();
                                 }
 
-                                
-
-
                                 // Retrieve the booking details
                                 Booking bookingDto = GetBookingId(bookingId);
 
                                 if (bookingDto != null)
                                 {
-                                    string dateJourney = bookingDto.JourneyoBo.DateJourney + " " + bookingDto.JourneyoBo.DepartuerJourney;
+                                    string dateJourney = $"{bookingDto.JourneyoBo.DateJourney} {bookingDto.JourneyoBo.DepartuerJourney}";
                                     QrCode jsonContent = new QrCode
                                     {
-                                        IdQrcode = 1,
-                                        DateََQrCode = dateJourney,
+                                        IdQrcode = Guid.NewGuid().ToString(),
+                                        DateQrCode = dateJourney,
                                         DateExpierDate = bookingDto.JourneyoBo.DepartuerJourney,
                                         IdScanner = GetIdScanner(bookingDto.JourneyoBo.BusID),
                                         QrCodeList = new List<string>()
                                     };
 
-                                    if (System.IO.File.Exists(JsonFileExist))
-                                    {
-                                        string symbol = GenerateUniqueValue(bookingDto.PhonePassenger);
-
-                                        bool flag = false;
-
-                                        // Ensure synchronization when reading and writing to existingJson
-                                        lock (existingJson)
+                                    string EndpointUri = "https://ticketonlinedatabase.documents.azure.com:443/";
+                                    string PrimaryKey = "ns1F6yzlZvWrCQ7ADj3qWIKIiKiMYjVYN0tdVgmo01wBw1IV5Z7hQDE5cjNf83n8cHZ02QR06QakACDbn1auNQ==";
+                                    string databaseId = "ContainerDataBase";
+                                    CosmosClient cosmosClient = new CosmosClient(EndpointUri, PrimaryKey,
+                                        new CosmosClientOptions()
                                         {
-                                            foreach (var existingEntry in existingJson)
+                                            ConnectionMode = ConnectionMode.Direct,
+                                            ApplicationName = "Azure2"
+                                        });
+                                    Database database = cosmosClient.GetDatabase(databaseId);
+                                    Container container = database.GetContainer("Container1");
+
+                                    // Query Cosmos DB to get all items
+                                    var query = new QueryDefinition("SELECT * FROM c");
+                                    var items = new List<dynamic>();
+                                    FeedIterator<dynamic> resultSetIterator = container.GetItemQueryIterator<dynamic>(query);
+
+                                    while (resultSetIterator.HasMoreResults)
+                                    {
+                                        FeedResponse<dynamic> response = await resultSetIterator.ReadNextAsync();
+                                        items.AddRange(response);
+
+                                    }
+                                    bool flag2 = false;
+                                    string symbol2 = GenerateUniqueValue(bookingDto.PhonePassenger);
+
+                                    if (items.Any())
+                                    {
+
+                                        foreach (var item in items)
+                                        {
+                                            var qrCode2 = Newtonsoft.Json.JsonConvert.DeserializeObject<QrCode>(item.ToString());
+
+                                            if (qrCode2.DateQrCode.Equals(dateJourney))
                                             {
-                                                if (existingEntry.DateََQrCode.Equals(dateJourney))
-                                                {
-                                                    existingEntry.QrCodeList.Add(symbol);
-                                                    flag = true;
-                                                    break;
-                                                }
+                                                qrCode2.QrCodeList.Add(symbol2);
+                                                flag2 = true;
+                                                var response = await container.ReplaceItemAsync(qrCode2, qrCode2.IdQrcode, new PartitionKey(qrCode2.IdQrcode));
                                             }
 
-                                            if (!flag)
-                                            {
-                                                jsonContent.QrCodeList.Add(symbol);
-                                                existingJson.Add(jsonContent);
-                                            }
-                                            saveQrcodePassenger.SavePassangerQrcodeToDatabase(phoneNumber, symbol);
-                                            // Write back the modified list to the file
-                                            System.IO.File.WriteAllText(JsonFileExist, JsonConvert.SerializeObject(existingJson));
                                         }
+                                    }
+
+                                        if (!flag2)
+                                        {
+                                            jsonContent.QrCodeList.Add(symbol2);
+                                            var result = await container.CreateItemAsync<QrCode>(jsonContent, new PartitionKey(jsonContent.IdQrcode));
+                                        }
+
+                                        saveQrcodePassenger.SavePassangerQrcodeToDatabase(bookingDto.PhonePassenger, symbol2);
 
                                         Console.WriteLine("File created successfully");
                                         connection.Close();
-                                        return Ok("ok is don payment");
-                                    }
+
+                                        return Ok("ok");
+                                    
                                 }
-                            }
-                        }
-                    }
+                        
                 }
 
                 return BadRequest("No pending booking found for the given phone number");
@@ -299,6 +328,7 @@ namespace TicketOnline.Controllers
                 return BadRequest(ModelState);
             }
         }
+
 
         [HttpGet("GetAllPassengerQrcode")]
         public IActionResult GetAllPassengerQrcode([FromQuery] string PhoneNumber)
@@ -340,6 +370,26 @@ namespace TicketOnline.Controllers
 
 
 
+        [HttpGet("GetNotification")]
+        public IActionResult GetAllNotification()
+        {
+            List<string> message = new List<string>();
+
+            try
+            {
+                message = notificationRepository.GetAllNotifications();
+            }
+            catch (Exception ex)
+            {
+                // Handle exception, e.g., log it or throw a custom exception
+                Console.WriteLine($"An error occurred while retrieving notifications from the database: {ex.Message}");
+                return StatusCode(500, "Internal Server Error");
+            }
+
+            return Ok(message);
+        }
+
+
         [ApiExplorerSettings(IgnoreApi = true)]
         public Booking GetBookingId(int id)
         {
@@ -378,6 +428,7 @@ namespace TicketOnline.Controllers
             {
                 // Handle exception, e.g., log it or throw a custom exception
                 Console.WriteLine($"An error occurred while fetching Booking by ID: {ex.Message}");
+               
             }
 
             return null; // Return null if Booking with the specified ID is not found
@@ -415,6 +466,7 @@ namespace TicketOnline.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occurred while getting the blocked count: {ex.Message}");
+                
             }
 
             return 0; // Return 0 if the passenger is not found or blocked count is not available
@@ -459,6 +511,7 @@ namespace TicketOnline.Controllers
             {
                 ModelState.AddModelError("bus", $"Sorry, but we have an exception: {ex.Message}");
                 Console.WriteLine(ModelState);
+               
             }
 
             return idScanner;
