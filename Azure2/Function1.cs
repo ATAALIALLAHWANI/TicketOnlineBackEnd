@@ -38,9 +38,7 @@ namespace Azure2
         {
             try
             {
-                string EndpointUri = "https://ticketonlinedatabase.documents.azure.com:443/";
-                string PrimaryKey = "ns1F6yzlZvWrCQ7ADj3qWIKIiKiMYjVYN0tdVgmo01wBw1IV5Z7hQDE5cjNf83n8cHZ02QR06QakACDbn1auNQ==";
-                string databaseId = "ContainerDataBase";
+              
                 CosmosClient cosmosClient = new CosmosClient(EndpointUri, PrimaryKey,
                        new CosmosClientOptions()
                        {
